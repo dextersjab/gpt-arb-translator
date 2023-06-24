@@ -55,6 +55,8 @@ def request_chat_completion(messages, model, functions=None):
             raise ValueError("Incorrect response format.")
         print(f"Response: {response_json}")
         return response
+    except json.JSONDecodeError:
+        print(f"Error decoding function_call arguments. Skipping translation.")
     except (requests.exceptions.HTTPError, ValueError) as err:
         print(f"Error occurred: {err}")
         print(f"Response body: {response.text if response else 'No response'}")
