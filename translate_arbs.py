@@ -142,10 +142,10 @@ def main():
     messages = [{"role": "system", "content": "You are a helpful assistant."}]
 
     # Translate each entry into each language
-    for key, translations in new_entries.items():
-        input_text = translations[args.lang]
-        for lang in languages:
-            if lang != args.lang:
+    for lang in languages:
+        if lang != args.lang:
+            for key, translations in new_entries.items():
+                input_text = translations[args.lang]
                 messages.append({
                     "role": "user",
                     "content": f"""
@@ -160,13 +160,15 @@ def main():
                     args.model,
                     functions=HANDLE_TRANSLATED_TEXT_FUNCTION,
                 )
-                function_call = chat_response.json()["choices"][0]["message"].get("function_call")
-                if function_call is not None and function_call["name"] == "handle_translated_text":
-                    translated_text = json.loads(function_call["arguments"])["translated_text"]
-                    new_entries[key][lang] = translated_text
 
-    # Update translation files
-    update_translation_files(args.indir, outdir, new_entries, args.out_langs)
+                if chat_response is not None and chat_response.status_code == 200:
+                    function_call = chat_response.json()["choices"][0]["message"].get("function_call")
+                    if function_call is not None and function_call["name"] == "handle_translated_text":
+                        translated_text = json.loads(function_call["arguments"])["translated_text"]
+                        new_entries[key][lang] = translated_text
+
+            # Update translation files after each language
+            update_translation_files(args.indir, outdir, new_entries, args.out_langs)
 
     print("Updated .arb files with new entries.")
 
