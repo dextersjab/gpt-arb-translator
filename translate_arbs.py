@@ -48,11 +48,14 @@ def request_chat_completion(messages, model, functions=None):
 
         # Check for correct format
         function_call = response_json["choices"][0]["message"].get("function_call")
-        if function_call is None or function_call["name"] != "handle_translated_text":
-            raise ValueError("Incorrect response format.")
-        arguments = json.loads(function_call["arguments"])
-        if "translated_text" not in arguments:
-            raise ValueError("Incorrect response format.")
+        if function_call is not None and function_call["name"] == "handle_translated_text":
+            arguments = json.loads(function_call["arguments"])
+            if "translated_text" not in arguments:
+                raise ValueError("Incorrect response format.")
+        else:
+            # When function call is not present, log the issue and return None.
+            print(f"Issue with language translation: {response_json['choices'][0]['message']['content']}")
+            return None
         print(f"Response: {response_json}")
         return response
     except json.JSONDecodeError:
@@ -64,7 +67,8 @@ def request_chat_completion(messages, model, functions=None):
     except Exception as e:
         print("Unable to generate ChatCompletion response")
         print(f"Exception: {e}")
-        return e
+        return None
+
 
 
 # Command line arguments parsing
@@ -86,42 +90,30 @@ parser.add_argument('--model', type=str, default='gpt-3.5-turbo-0613',
 args = parser.parse_args()
 
 
-def update_translation_files(indir, outdir, new_entries, out_langs):
+def update_translation_file(file_path, new_entries):
     """
-    Function to update the translation files with new and removed entries.
+    Function to update a specific translation file with new entries.
     """
-    file_names = [f for f in os.listdir(indir) if os.path.splitext(f)[1] == '.arb']
+    if os.path.isfile(file_path):
+        with open(file_path, 'r', encoding='utf-8') as input_file:
+            data = json.load(input_file)
+    else:
+        data = {}
 
-    if not file_names:
-        # If there are no .arb files in the directory, use the provided list of languages to create files
-        file_names = [f"app_{lang}.arb" for lang in out_langs]
+    data.update(new_entries)
 
-    for file_name in file_names:
-        input_file_path = os.path.join(indir, file_name)
-        output_file_path = os.path.join(outdir, file_name)
-        language_code = file_name.split('_')[1].split('.')[0]  # Assuming file names like "app_en.arb"
+    # Sort entries by key in alphabetical order
+    sorted_data = {k: data[k] for k in sorted(data)}
 
-        if os.path.isfile(input_file_path):
-            with open(input_file_path, 'r', encoding='utf-8') as input_file:
-                data = json.load(input_file)
-        else:
-            data = {}
-
-        for key, translations in new_entries.items():
-            if language_code in translations:
-                data[key] = translations[language_code]
-
-        # Sort entries by key in alphabetical order
-        sorted_data = {k: data[k] for k in sorted(data)}
-
-        with open(output_file_path, 'w', encoding='utf-8') as output_file:
-            print(f"Writing {output_file_path}")
-            output_file.write(json.dumps(sorted_data, ensure_ascii=False, indent=2))
+    with open(file_path, 'w', encoding='utf-8') as output_file:
+        output_file.write(json.dumps(sorted_data, ensure_ascii=False, indent=2))
 
 
 def main():
     # Set outdir to indir if not specified
     outdir = args.outdir if args.outdir else args.indir
+    BATCH_SIZE = 5  # Or any other number that makes sense for your use case
+    batch_entries = {}
 
     # Convert the entries command line argument into a dictionary
     new_entries = {}
@@ -144,7 +136,16 @@ def main():
     # Translate each entry into each language
     for lang in languages:
         if lang != args.lang:
-            for key, translations in new_entries.items():
+            # Read existing keys from the .arb file for this language
+            file_path = os.path.join(outdir, f"app_{lang}.arb")
+            existing_keys = {}
+            if os.path.isfile(file_path):
+                with open(file_path, 'r', encoding='utf-8') as input_file:
+                    existing_keys = json.load(input_file)
+            for i, (key, translations) in enumerate(new_entries.items()):
+                # Skip API call if the key already exists
+                if key in existing_keys:
+                    continue
                 input_text = translations[args.lang]
                 messages.append({
                     "role": "user",
@@ -165,10 +166,17 @@ def main():
                     function_call = chat_response.json()["choices"][0]["message"].get("function_call")
                     if function_call is not None and function_call["name"] == "handle_translated_text":
                         translated_text = json.loads(function_call["arguments"])["translated_text"]
-                        new_entries[key][lang] = translated_text
+                        batch_entries[key] = translated_text
 
-            # Update translation files after each language
-            update_translation_files(args.indir, outdir, new_entries, args.out_langs)
+                # Write batched entries to .arb file after every BATCH_SIZE translations
+                if (i+1) % BATCH_SIZE == 0:
+                    update_translation_file(file_path, batch_entries)
+                    batch_entries.clear()
+
+            # Write remaining batched entries to .arb file after translating all entries for the language
+            if batch_entries:
+                update_translation_file(file_path, batch_entries)
+                batch_entries.clear()
 
     print("Updated .arb files with new entries.")
 
