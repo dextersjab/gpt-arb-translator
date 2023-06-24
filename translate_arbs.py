@@ -5,6 +5,12 @@ import os
 import requests
 from tenacity import retry, wait_random_exponential, stop_after_attempt
 
+# Example command:
+# ```
+# python scripts/update_arbs.py --indir lib/l10n --entries key="new text"
+# ```
+# Replace "key" and "new text" with the new arb mappings
+
 # Constants
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 API_ENDPOINT = "https://api.openai.com/v1/chat/completions"
@@ -94,6 +100,8 @@ def update_translation_file(file_path, new_entries):
     """
     Function to update a specific translation file with new entries.
     """
+    print(f"{file_path=}")
+    print(f"{new_entries=}")
     if os.path.isfile(file_path):
         with open(file_path, 'r', encoding='utf-8') as input_file:
             data = json.load(input_file)
@@ -123,6 +131,8 @@ def main():
         key, value = entry.split('=', 1)
         new_entries[key] = {args.lang: value}
 
+    input_lang_file_path = os.path.join(outdir, f"app_{args.lang}.arb")
+    update_translation_file(input_lang_file_path, {k: v[args.lang] for k, v in new_entries.items()})
     # List of languages to translate into
     if args.out_langs:
         languages = args.out_langs
