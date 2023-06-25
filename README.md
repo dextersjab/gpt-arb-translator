@@ -9,13 +9,13 @@ Flutter and looking to localize their applications.
 1. Clone this repository:
 
 ```shell
-git clone https://github.com/username/OpenAI-ARB-Translator.git
+git clone https://github.com/dextersjab/gpt-arb-translator.git
 ```
 
 2. Navigate to the cloned directory and install the required Python packages:
 
 ```shell
-cd OpenAI-ARB-Translator
+cd gpt-arb-translator
 pip install -r requirements.txt
 ```
 
@@ -32,8 +32,6 @@ Now you can run the script on the command line. The command-line arguments are:
 - `indir`: The directory containing your input .arb files.
 - `outdir` (optional): The directory where the translated .arb files will be
   output. Defaults to the input directory if not specified.
-- `entries`: Key-value pairs that need to be translated in the format '
-  key=value'. You can specify any number of these.
 - `lang` (optional): The base language in which the key-value pairs are
   provided, specified as a 2-letter ISO 639-1 code. Defaults to 'en' if not
   specified.
@@ -48,7 +46,7 @@ python translate_arbs.py --indir 'your/input/directory' --outdir 'your/output/di
 
 ## Example
 
-Let's say you want to have arb files that translate the following from English:
+Let's say you have a base .arb file (app_en.arb) with the following content in English:
 
 ```json
 {
@@ -57,11 +55,17 @@ Let's say you want to have arb files that translate the following from English:
 }
 ```
 
-Here's how you might use the script to translate this quote into multiple
-languages:
+Here's how you might use the script to translate this .arb file into all other languages in your output directory:
 
 ```shell
-python translate_arbs.py --entries "hdtQuote=The language of friendship is not words but meanings." "noMoat=We have no moat." --out_langs en fr es
+python translate_arbs.py --indir 'your/input/directory' --outdir 'your/output/directory' --lang 'en'
+```
+
+Alternatively, you could specify the output languages using `--out_langs`.
+Here's how you might use the script to translate this .arb file into French and Spanish:
+
+```shell
+python translate_arbs.py --indir 'your/input/directory' --outdir 'your/output/directory' --lang 'en' --out_langs fr es
 ```
 
 ## Notes
